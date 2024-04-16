@@ -1,6 +1,7 @@
 package cn.ksmcbrigade.ba;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.stream.JsonReader;
@@ -18,6 +19,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class Utils {
 
     public static Thread thread;
+
+    public static boolean c = false;
 
     public static void to(String BV, Player player,boolean whi,boolean list,boolean listWhile){
 
@@ -38,16 +41,27 @@ public class Utils {
         }
         thread = new Thread(() -> {
             try {
+                c = false;
                 player.sendSystemMessage(Component.translatable("command.ba.jx"));
                 JsonObject data = JsonParser.parseReader(new JsonReader(new InputStreamReader(toIN(get(dataAPI+BV))))).getAsJsonObject().getAsJsonObject("data");
                 JsonArray audioData = JsonParser.parseReader(new JsonReader(new InputStreamReader(toIN(get(audioAPI.replace("{a}",data.get("aid").getAsString()).replace("{c}",data.get("cid").getAsString())))))).getAsJsonObject().getAsJsonObject("data").getAsJsonObject("dash").getAsJsonArray("audio");
                 String audioURL = audioData.get(0).getAsJsonObject().get("baseUrl").getAsString();
                 if(!whi){
+                    if(c){
+                        c = false;
+                        player.sendSystemMessage(Component.nullToEmpty(I18n.get("command.ba.stop").replace("{}",data.get("title").getAsString())));
+                        return;
+                    }
                     play(audioURL,player,true,data);
                     player.sendSystemMessage(Component.nullToEmpty(I18n.get("command.ba.stop").replace("{}",data.get("title").getAsString())));
                 }
                 else{
                     while (true){
+                        if(c){
+                            c = false;
+                            player.sendSystemMessage(Component.nullToEmpty(I18n.get("command.ba.stop").replace("{}",data.get("title").getAsString())));
+                            continue;
+                        }
                         play(audioURL,player,false,data);
                         player.sendSystemMessage(Component.nullToEmpty(I18n.get("command.ba.stop").replace("{}",data.get("title").getAsString())));
                     }
@@ -59,13 +73,18 @@ public class Utils {
                     JsonArray sections = data.getAsJsonObject("ugc_season").getAsJsonArray("sections").get(0).getAsJsonObject().getAsJsonArray("episodes");
                     AtomicBoolean tz = new AtomicBoolean(false);
                     if(!listWhile){
-                        sections.forEach(e -> {
+                        for(JsonElement e:sections){
                             if(e instanceof JsonObject audio){
                                 if(!audio.get("bvid").getAsString().equalsIgnoreCase(BV)){
                                     JsonArray audioDataNow = null;
                                     try {
                                         audioDataNow = JsonParser.parseReader(new JsonReader(new InputStreamReader(toIN(get(audioAPI.replace("{a}",audio.get("aid").getAsString()).replace("{c}",audio.get("cid").getAsString())))))).getAsJsonObject().getAsJsonObject("data").getAsJsonObject("dash").getAsJsonArray("audio");
                                         String audioURLNow = audioDataNow.get(0).getAsJsonObject().get("baseUrl").getAsString();
+                                        if(c){
+                                            c = false;
+                                            player.sendSystemMessage(Component.nullToEmpty(I18n.get("command.ba.stop").replace("{}",audio.get("title").getAsString())));
+                                            continue;
+                                        }
                                         play(audioURLNow,player,true,audio);
                                         player.sendSystemMessage(Component.nullToEmpty(I18n.get("command.ba.stop").replace("{}",audio.get("title").getAsString())));
                                     } catch (IOException ex) {
@@ -74,11 +93,16 @@ public class Utils {
                                     }
                                 }
                             }
-                        });
+                        }
+                        /*sections.forEach(e -> {
+                            if(e instanceof JsonObject audio){
+
+                            }
+                        });*/
                     }
                     else{
                         while (true){
-                            sections.forEach(e -> {
+                            for(JsonElement e:sections){
                                 if(e instanceof JsonObject audio){
                                     boolean yg = false;
                                     if(audio.get("bvid").getAsString().equalsIgnoreCase(BV) && !tz.get()){
@@ -90,6 +114,11 @@ public class Utils {
                                         try {
                                             audioDataNow = JsonParser.parseReader(new JsonReader(new InputStreamReader(toIN(get(audioAPI.replace("{a}",audio.get("aid").getAsString()).replace("{c}",audio.get("cid").getAsString())))))).getAsJsonObject().getAsJsonObject("data").getAsJsonObject("dash").getAsJsonArray("audio");
                                             String audioURLNow = audioDataNow.get(0).getAsJsonObject().get("baseUrl").getAsString();
+                                            if(c){
+                                                c = false;
+                                                player.sendSystemMessage(Component.nullToEmpty(I18n.get("command.ba.stop").replace("{}",audio.get("title").getAsString())));
+                                                continue;
+                                            }
                                             play(audioURLNow,player,true,audio);
                                             player.sendSystemMessage(Component.translatable("command.ba.stop"));
                                         } catch (IOException ex) {
@@ -98,10 +127,14 @@ public class Utils {
                                         }
                                     }
                                 }
-                            });
+                            }
+                            /*sections.forEach(e -> {
+
+                            });*/
                         }
                     }
                 }
+                c = false;
             }
             catch (Exception e){
                 e.printStackTrace();
@@ -173,11 +206,15 @@ public class Utils {
             int bytesRead;
             while ((bytesRead = audioInputStream.read(buffer)) != -1) {
                 line.write(buffer, 0, bytesRead);
+                if(c){
+                    c = false;
+                    break;
+                }
             }
             line.stop();
             line.close();
 
-            while (line.isOpen() && line.isRunning()) {
+            while (line.isOpen() && line.isRunning() && !c) {
                 Thread.sleep(10);
             }
             audioInputStream.close();
@@ -218,7 +255,10 @@ public class Utils {
             sourceDataLine.close();
             audioInputStream2.close();*/
             File file = new File("temp.wav");
-            downloadFile(audioURL,"temp.m4s");
+
+            if(!file.exists() || de){
+                downloadFile(audioURL,"temp.m4s");
+            }
 
             Runtime.getRuntime().exec("ffe.exe -i temp.m4s temp.wav").waitFor();
 

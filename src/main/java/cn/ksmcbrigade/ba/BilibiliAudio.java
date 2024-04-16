@@ -55,6 +55,13 @@ public class BilibiliAudio {
             Utils.to(BV,player,whi,list,LW);
             return 0;
         }))))));
+
+        event.getDispatcher().register(Commands.literal("BNext").executes(context -> {
+            if(Utils.thread!=null){
+                Utils.c = true;
+            }
+            return 0;
+        }));
     }
 
     @SubscribeEvent
